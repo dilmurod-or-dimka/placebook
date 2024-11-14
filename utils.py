@@ -1,11 +1,16 @@
 import secrets
 from datetime import datetime, timedelta
+from select import select
 
 from fastapi import Depends,HTTPException
 import jwt
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.ext.asyncio import AsyncSession
+from watchfiles import awatch
 
+from account.models import users
 from config import SECRET
+from database import get_async_session
 
 algorithm = 'HS256'
 security = HTTPBearer()
@@ -45,3 +50,9 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
         raise HTTPException(status_code=401, detail='Token is expired!')
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail='Token invalid!')
+
+
+async def admin_check(admin_id,
+                session: AsyncSession = Depends(get_async_session)):
+    checking_admin = await session.execute(select(users).where((users.c.id == admin_id) & (users.c.is_admin == True)))
+    return bool(checking_admin.scalar())

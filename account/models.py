@@ -3,7 +3,6 @@ from datetime import datetime
 from sqlalchemy import Table, Column, Integer, String, Float, Boolean, DateTime, ForeignKey, MetaData, DATETIME
 from sqlalchemy.sql import func
 
-# Initialize metadata object
 metadata = MetaData()
 
 # User table

@@ -1,12 +1,11 @@
 from fastapi import FastAPI, APIRouter, Depends, HTTPException
-from pycparser.ply.yacc import token
 from sqlalchemy import select, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.sync import update
 
 from account.models import *
 from passlib.context import CryptContext
-
+from scheme import LoginModel
 from database import get_async_session
 from utils import generate_token
 
@@ -21,7 +20,6 @@ async def register(
         session: AsyncSession = Depends(get_async_session)
 ):
     if password1 == password2:
-
         email_exists = await session.execute(select(users).where(users.c.email == email))
         email_exists_value = email_exists.scalar()
 
@@ -57,16 +55,15 @@ async def register(
 
 
 @router.post('/login')
-async def login(email,
-                password,
+async def login(user:LoginModel,
                 session: AsyncSession = Depends(get_async_session)
         ):
-    check_user = await session.execute(select(users).where(email == users.c.email))
+    check_user = await session.execute(select(users).where(user.email == users.c.email))
     check_user_value = check_user.one_or_none()
     if check_user_value is None:
         raise HTTPException(status_code=400, detail='Email or password is not correct!')
     else:
-        password_check = pwd_context.verify(password, check_user_value.hashed_password)
+        password_check = pwd_context.verify(user.password, check_user_value.hashed_password)
         if password_check:
             token = generate_token(check_user_value.id)
             return {'success': True, 'token': token}
