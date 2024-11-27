@@ -1,18 +1,20 @@
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, status, HTTPException, File, UploadFile, Query
 import os
 from sqlalchemy import select, delete
+from sqlalchemy.dialects.mysql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.sync import update
 from sqlalchemy.orm.unitofwork import DeleteAll
+from sqlalchemy.sql.functions import current_user
 from starlette.responses import FileResponse
 
-from account.models import users, restaurant
+from account.models import users, restaurant, locations_of_restaurant
 from config import PHOTO_DIR
 from database import get_async_session
 from scheme import RestaurantModel
-from utils import verify_token
+from utils import verify_token, admin_check
 
 router = APIRouter(tags=['restaurant'])
 
@@ -54,6 +56,7 @@ async def add_restaurant(
         address=address,
         phone_number=phone_number,
         number_of_people=number_of_people,
+        seats_left=number_of_people,
         description=description,
         photo_url=str(photo_path)
     )
@@ -62,6 +65,85 @@ async def add_restaurant(
     await session.commit()
 
     return {"message": "Restaurant added successfully"}
+
+
+@router.post('/add-location')
+async def add_location(restaurant_id:int,
+                       longitude: float,
+                       latitude: float,
+                       session: AsyncSession = Depends(get_async_session),
+                       token: dict = Depends(verify_token)
+        ):
+    current_user_id = token.get('user_id')
+    if not await admin_check(current_user_id,session):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to delete orders."
+        )
+    check_restaurant = await session.execute(select(restaurant).where(restaurant.c.id == restaurant_id))
+    if not check_restaurant.scalar():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Restaurant does not exist.")
+
+    restaurant_exists = await session.execute(select(locations_of_restaurant).where(locations_of_restaurant.c.restaurant_id == restaurant_id))
+    if restaurant_exists.scalar():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="This restaurant's location is already exists.")
+
+    query = await session.execute(insert(locations_of_restaurant).values(
+        restaurant_id=restaurant_id,
+        longitude=longitude,
+        latitude=latitude
+    ))
+    await session.commit()
+    return {"message": "Location added successfully"}
+
+
+@router.put('/edit-location')
+async def edit_location(
+    restaurant_id: int,
+    longitude: float,
+    latitude: float,
+    session: AsyncSession = Depends(get_async_session),
+    token: dict = Depends(verify_token),
+):
+    current_user_id = token.get('user_id')
+
+    if not await admin_check(current_user_id, session):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to edit locations."
+        )
+
+    check_restaurant = await session.execute(
+        select(restaurant).where(restaurant.c.id == restaurant_id)
+    )
+    if not check_restaurant.scalar():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant does not exist."
+        )
+
+    location_exists = await session.execute(
+        select(locations_of_restaurant).where(locations_of_restaurant.c.restaurant_id == restaurant_id)
+    )
+    location = location_exists.scalar()
+    if not location:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Location does not exist for this restaurant."
+        )
+
+    await session.execute(
+        update(locations_of_restaurant)
+        .where(locations_of_restaurant.c.restaurant_id == restaurant_id)
+        .values(
+            longitude=longitude,
+            latitude=latitude
+        )
+    )
+    await session.commit()
+
+    return {"message": "Location updated successfully"}
+
 
 
 @router.get('/get-all-restaurants', response_model=List[RestaurantModel])
@@ -77,7 +159,10 @@ async def get_restaurant(resraurant_id: int,
                          session: AsyncSession = Depends(get_async_session)
                          ):
     restaurant_item = await session.execute(select(restaurant).where(restaurant.c.id == resraurant_id))
-    return restaurant_item.mappings().one()
+    result = restaurant_item.mappings().first()
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Restaurant does not exist.")
+    return result
 
 
 @router.get('/get-restaurant-photo')
@@ -135,7 +220,6 @@ async def update_restaurant(
     if not fields_to_update:
         raise HTTPException(status_code=400, detail="Please provide at least one field to update.")
 
-        # Perform the update operation on the database
     async with session.begin():
         stmt = (
             restaurant.update()

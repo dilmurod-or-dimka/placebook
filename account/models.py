@@ -1,11 +1,12 @@
 from datetime import datetime
+from email.policy import default
 
 from sqlalchemy import Table, Column, Integer, String, Float, Boolean, DateTime, ForeignKey, MetaData, DATETIME
 from sqlalchemy.sql import func
 
 metadata = MetaData()
 
-# User table
+
 users = Table(
     "users",
     metadata,
@@ -15,13 +16,21 @@ users = Table(
     Column("email", String, unique=True, index=True),
     Column("hashed_password", String),
     Column("phone_number", String, unique=True),
-    Column("is_admin", Boolean),
+    Column("is_admin", Boolean,default=False),
     Column("is_active", Boolean, default=True),
     Column("activation_code", Integer),
     Column("created_at", DateTime, default=datetime.utcnow()),
 )
 
-# Restaurant table
+restaurant_owner = Table(
+    'restaurants_owner',
+    metadata,
+    Column("id", Integer, primary_key=True, index=True),
+    Column("restaurant_id", Integer, ForeignKey("restaurants.id")),
+    Column("owner_id", Integer, ForeignKey("users.id")),
+)
+
+
 restaurant = Table(
     "restaurants",
     metadata,
@@ -30,9 +39,19 @@ restaurant = Table(
     Column("address", String),
     Column("phone_number", String),
     Column("number_of_people", Integer),
+    Column("seats_left", Integer),
     Column("is_open", Boolean, default=True),
     Column("description", String),
     Column("photo_url", String)
+)
+
+locations_of_restaurant = Table(
+    'locations',
+    metadata,
+    Column("id", Integer, primary_key=True, index=True),
+    Column('restaurant_id', Integer, ForeignKey('restaurants.id')),
+    Column('latitude', Float),
+    Column('longitude', Float),
 )
 
 restaurants_photos = Table(
@@ -47,22 +66,16 @@ food_categories = Table(
     "food_categories",
     metadata,
     Column("id", Integer, primary_key=True, index=True),
+    Column('restaurant_id', Integer, ForeignKey('restaurants.id')),
     Column("name", String, unique=True, index=True)
 )
 
-food_categories_item = Table(
-    "food_categories_item",
-    metadata,
-    Column("id", Integer, primary_key=True, index=True),
-    Column("category_id", Integer, ForeignKey("food_categories.id"), nullable=False),
-    Column("item_id", Integer, ForeignKey("menu_items.id"), nullable=False)
-)
 
 MenuItem = Table(
     "menu_items",
     metadata,
     Column("id", Integer, primary_key=True, index=True),
-    Column("restaurant_id", Integer, ForeignKey("restaurants.id"), nullable=False),
+    Column('food_categories_id', Integer, ForeignKey('food_categories.id')),
     Column("name", String),
     Column("description", String),
     Column("price", Float),
@@ -88,11 +101,10 @@ Reservation = Table(
     Column("restaurant_id", Integer, ForeignKey("restaurants.id"), nullable=False),
     Column("reservation_time", DateTime),
     Column("num_people", Integer),
-    Column("special_request", String, nullable=True),
-    Column("created_at", DateTime(timezone=True), server_default=func.now())
+    Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    Column("is_active", Boolean, default=False)
 )
 
-# Favorite Restaurant table
 FavoriteRestaurant = Table(
     "favorite_restaurants",
     metadata,
@@ -102,7 +114,6 @@ FavoriteRestaurant = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now())
 )
 
-# Notification table
 Notification = Table(
     "notifications",
     metadata,
