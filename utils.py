@@ -1,5 +1,8 @@
 import secrets
+import smtplib
 from datetime import datetime, timedelta
+from email.message import EmailMessage
+
 from sqlalchemy import select
 
 from fastapi import Depends,HTTPException
@@ -8,9 +11,10 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from watchfiles import awatch
 from math import radians, sin, cos, sqrt, atan2
+from celery import Celery
 
 from account.models import users, restaurant_owner
-from config import SECRET
+from config import SECRET, MAIL_USERNAME, MAIL_PORT, MAIL_SERVER,MAIL_PASSWORD, MAIL_FROM
 from database import get_async_session
 
 algorithm = 'HS256'
@@ -78,3 +82,32 @@ async def check_permissions(user_id: int, restaurant_id: int, session: AsyncSess
     )
     owners = [row.owner_id for row in result.mappings()]
     return user_id in owners
+
+
+
+
+def get_email_template_dashboard(user_email, code):
+    email = EmailMessage()
+    email['Subject'] = f'Verify email'
+    email['From'] = MAIL_USERNAME
+    email['To'] = user_email
+
+    email.set_content(
+        f"""
+        <div>
+            <h1 style="color: black;"> Hi!😊 </h1>
+            <h1 style="color: black;">Enter the verification code below to activate your account: </h1>
+            <h1 style="margin: 0; padding-right: 2px; width: 90px ; background-color: green; color: white;"> {code} </h1>
+        </div>
+        """,
+        subtype='html'
+    )
+    return email
+
+async def send_mail_for_forget_password(email: str, code: int):
+    email = get_email_template_dashboard(email, code)
+    with smtplib.SMTP_SSL(MAIL_SERVER, MAIL_PORT) as server:
+        server.login(MAIL_FROM, MAIL_PASSWORD)
+        server.send_message(email)
+
+

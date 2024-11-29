@@ -45,8 +45,6 @@ class ReviewBase(BaseModel):
     rating: int
     comment: Optional[str] = None
 
-
-
 class ReviewResponse(ReviewBase):
     id: int
     created_at: datetime

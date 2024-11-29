@@ -35,7 +35,7 @@ async def send_sms(phone_number: str, message: str):
             data={
                 "mobile_phone": phone_number,
                 "message": message,
-                "from": "Mirzabek",  # Replace with your sender name or ID from Eskiz
+                "from": "Mirzabek",
             },
         )
         if response.status_code != 200:
