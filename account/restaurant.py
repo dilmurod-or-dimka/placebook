@@ -68,31 +68,50 @@ async def add_restaurant(
 
 
 @router.post('/add-location')
-async def add_location(restaurant_id:int,
-                       longitude: float,
-                       latitude: float,
-                       session: AsyncSession = Depends(get_async_session),
-                       token: dict = Depends(verify_token)
-        ):
+async def add_location(
+        restaurant_id: int,
+        coordinates: str,
+        session: AsyncSession = Depends(get_async_session),
+        token: dict = Depends(verify_token),
+):
     current_user_id = token.get('user_id')
-    if not await admin_check(current_user_id,session):
+
+    # Check if the user is an admin
+    if not await admin_check(current_user_id, session):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to delete orders."
+            detail="You do not have permission to add a location."
         )
+
+    # Verify restaurant existence
     check_restaurant = await session.execute(select(restaurant).where(restaurant.c.id == restaurant_id))
     if not check_restaurant.scalar():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Restaurant does not exist.")
 
-    restaurant_exists = await session.execute(select(locations_of_restaurant).where(locations_of_restaurant.c.restaurant_id == restaurant_id))
+    # Verify if location already exists
+    restaurant_exists = await session.execute(
+        select(locations_of_restaurant).where(locations_of_restaurant.c.restaurant_id == restaurant_id))
     if restaurant_exists.scalar():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="This restaurant's location is already exists.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="This restaurant's location already exists.")
 
-    query = await session.execute(insert(locations_of_restaurant).values(
-        restaurant_id=restaurant_id,
-        longitude=longitude,
-        latitude=latitude
-    ))
+    # Parse the coordinates
+    try:
+        latitude, longitude = map(float, coordinates.split(','))
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid coordinates format. Expected 'latitude,longitude'."
+        )
+
+    # Insert the location
+    query = await session.execute(
+        insert(locations_of_restaurant).values(
+            restaurant_id=restaurant_id,
+            latitude=latitude,
+            longitude=longitude
+        )
+    )
     await session.commit()
     return {"message": "Location added successfully"}
 
