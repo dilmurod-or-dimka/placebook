@@ -29,14 +29,14 @@ def generate_token(user_id:int):
         "type": 'access',
         "user_id": user_id,
         "jti_access": jti_access,
-        "exp": datetime.utcnow()+ timedelta(minutes=30),
+        "exp": datetime.utcnow()+ timedelta(days=7),
     }
 
     payload_refresh = {
         'type':'refresh',
         'jti_refresh': jti_refresh,
         'user_id': user_id,
-        'exp': datetime.utcnow()+ timedelta(days=1)
+        'exp': datetime.utcnow()+ timedelta(days=10)
     }
     access_token = jwt.encode(payload_access, SECRET, algorithm=algorithm)
     refresh_token = jwt.encode(payload_refresh, SECRET, algorithm=algorithm)

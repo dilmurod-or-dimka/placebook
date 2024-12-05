@@ -7,67 +7,77 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from account.models import Reservation, users, restaurant
 from database import get_async_session
+from scheme import OrderInput
 from utils import verify_token, admin_check
 
 router = APIRouter(tags=['Orders'])
 
 
-@router.get('/orders', response_model=List[dict])
+@router.get('/orders')
 async def get_orders(
-    session: AsyncSession = Depends(get_async_session),
-    token: dict = Depends(verify_token),
+        session: AsyncSession = Depends(get_async_session),
+        token: dict = Depends(verify_token),
 ):
     user_id = token['user_id']
-    check_admin = await admin_check(user_id,session)
+    check_admin = await admin_check(user_id, session)  # Assuming admin_check is async
     if not check_admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,detail="You do not have permission to perform this action.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="You do not have permission to perform this action.")
+
     result = await session.execute(select(Reservation))
-    if result.scalar() is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail='You do not have orders yet')
-    orders = result.mappings().all()
+    orders = result.mappings().all()  # Get the list of orders
+
+    if not orders:  # Check if orders list is empty
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='You do not have orders yet')
+
     return orders
 
 
 @router.post('/make-order', response_model=dict)
 async def make_order(
-    restaurant_id: int,
-    date: str,
-    number_of_people:int,
+    order_data: OrderInput,
     token: dict = Depends(verify_token),
     session: AsyncSession = Depends(get_async_session),
 ):
     user_id = token['user_id']
-    selected_date = datetime.strptime(date, "%Y-%m-%d" )
 
-    # check_user = await session.execute(select(Reservation).where(Reservation.c.user_id == user_id))
-    # if check_user.scalar():
-    #     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='You already have an order')
-
-    restaurant_check = await session.execute(select(restaurant).where(restaurant.c.id == restaurant_id))
-    if not restaurant_check.scalar():raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                                                         detail="Restaurant not found."
+    # Validate the restaurant
+    restaurant_check = await session.execute(select(restaurant).where(restaurant.c.id == order_data.restaurant_id))
+    if not restaurant_check.scalar():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant not found."
         )
-    selected_restaurant = await session.execute(select(restaurant.c.seats_left).where(restaurant.c.id == restaurant_id))
-    left_seats = selected_restaurant.scalar()
-    if left_seats - number_of_people <= 0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='No seats left')
 
-    order_data = {
+    # Check seat availability
+    selected_restaurant = await session.execute(
+        select(restaurant.c.seats_left).where(restaurant.c.id == order_data.restaurant_id)
+    )
+    left_seats = selected_restaurant.scalar()
+    if left_seats - order_data.number_of_people <= 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No seats left")
+
+    # Create the order
+    order_values = {
         "user_id": user_id,
-        "restaurant_id": restaurant_id,
-        "num_people": number_of_people,
-        "reservation_time": selected_date,
+        "restaurant_id": order_data.restaurant_id,
+        "num_people": order_data.number_of_people,
+        "reservation_time": order_data.reservation_time,
         "is_active": True,
     }
+
+    # Update restaurant seats
     await session.execute(
         update(restaurant)
-        .where(restaurant.c.id == restaurant_id)
-        .values(seats_left=restaurant.c.seats_left - number_of_people)
+        .where(restaurant.c.id == order_data.restaurant_id)
+        .values(seats_left=restaurant.c.seats_left - order_data.number_of_people)
     )
-    await session.execute(insert(Reservation).values(order_data))
+
+    # Insert the reservation
+    await session.execute(insert(Reservation).values(order_values))
     await session.commit()
 
-    return {"message": "Order created successfully", "order": order_data}
+    return {"message": "Order created successfully", "order": order_values}
 
 
 @router.delete('/delete-order', response_model=dict)

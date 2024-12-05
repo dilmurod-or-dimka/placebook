@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import UploadFile, File
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 
 
 class UserInfo(BaseModel):
@@ -71,3 +71,17 @@ class FoodItemModel(BaseModel):
     price: float
     description:str
     photo:str
+
+
+class OrderInput(BaseModel):
+    restaurant_id: int
+    reservation_time: str  # Expecting timestamp in "%Y-%m-%d %H:%M:%S"
+    number_of_people: int
+
+    @validator("reservation_time")
+    def validate_datetime(cls, value):
+        try:
+            return datetime.strptime(value, "%Y-%m-%d %H:%M")
+        except ValueError:
+            raise ValueError("Invalid datetime format. Use 'YYYY-MM-DD HH:MM'.")
+

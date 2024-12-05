@@ -21,7 +21,8 @@ MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
 
 
 BASE_DIR=Path(__file__).resolve().parent.parent
-PHOTO_DIR = Path(BASE_DIR) /'fastApiProject'/ 'media' / 'photos'
+PHOTO_DIR = Path(BASE_DIR) /'placebook'/ 'media' / 'photos'
 PHOTO_DIR.mkdir(parents=True, exist_ok=True)
+
 
 

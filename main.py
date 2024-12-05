@@ -1,8 +1,8 @@
-from mako.parsetree import DefTag
+from pydantic import BaseModel
 from sqlalchemy import select, func, desc
 from typing import List
 
-from fastapi import FastAPI, APIRouter, Depends, Query, HTTPException
+from fastapi import FastAPI, APIRouter, Depends, HTTPException,status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import account.auth
@@ -18,7 +18,8 @@ from scheme import HomePageModel
 from send_sms import send_sms
 from utils import calculate_distance
 
-app = FastAPI()
+SECRET_KEY = "ca1ed94261ae6da2f2d81a487e7017c420ed69dd0f81e59817ab768bdc000cbb"
+app = FastAPI( docs_url=f"/docs/{SECRET_KEY}",)
 router = APIRouter(tags=["home"])
 
 
@@ -47,8 +48,7 @@ async def most_popular(session: AsyncSession = Depends(get_async_session)):
 
 @router.get('/nearby_restaurants', summary="Get restaurants nearby")
 async def nearby_restaurants(
-        longitude: float = Query(..., description="User's longitude"),
-        latitude: float = Query(..., description="User's latitude"),
+        coordinates:str,
         session: AsyncSession = Depends(get_async_session)
 ) -> List[dict]:
     location_query = (
@@ -58,27 +58,32 @@ async def nearby_restaurants(
     )
     results = await session.execute(location_query)
     restaurants = results.mappings().all()
+    try:
+        latitude, longitude = map(float, coordinates.split(','))
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid coordinates format. Expected 'latitude,longitude'."
+        )
 
-    # Debug: Log input coordinates
-    print(f"User location: latitude={latitude}, longitude={longitude}")
-
-    # Calculate distances
     restaurant_distances = []
     for r in restaurants:
         distance = calculate_distance(latitude, longitude, r["latitude"], r["longitude"])
-        print(f"Restaurant: {r['name']}, Distance: {distance} km")  # Debug output
         restaurant_distances.append({
             "id": r["id"],
             "name": r["name"],
             "description": r["description"],
-            "distance": round(distance, 2)
+            "distance": f"{round(distance, 2)} km"
         })
 
     sorted_restaurants = sorted(restaurant_distances, key=lambda x: x["distance"])
     return sorted_restaurants
 
 
-@router.get('/newest-restaurants', summary="Get newest restaurants", response_model=List[HomePageModel])
+class NewestRestaurantsResponse(BaseModel):
+    newest_restaurants: List[HomePageModel]
+
+@router.get('/newest-restaurants', summary="Get newest restaurants", response_model=NewestRestaurantsResponse)
 async def newest_restaurants(session: AsyncSession = Depends(get_async_session)):
     query = (
         select(

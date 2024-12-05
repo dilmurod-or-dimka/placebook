@@ -42,7 +42,8 @@ restaurant = Table(
     Column("seats_left", Integer),
     Column("is_open", Boolean, default=True),
     Column("description", String),
-    Column("photo_url", String)
+    Column("created_at", DateTime, default=datetime.utcnow()),
+    Column('chat_id', Integer, nullable=True),
 )
 
 locations_of_restaurant = Table(
