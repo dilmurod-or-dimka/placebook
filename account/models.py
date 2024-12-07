@@ -80,7 +80,8 @@ MenuItem = Table(
     Column("name", String),
     Column("description", String),
     Column("price", Float),
-    Column("image_url", String)
+    Column("image_url", String),
+    Column('created_at', DateTime, default=datetime.utcnow()),
 )
 
 Review = Table(

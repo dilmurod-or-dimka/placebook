@@ -95,7 +95,7 @@ async def add_food_to_category(
     while True:
         random_number = random.randint(10000, 99999)
         image_filename = f"{random_number}_{name}.{file_extension}"
-        image_path = Path(f"./media/photos/{image_filename}")
+        image_path = PHOTO_DIR / image_filename
         if not image_path.exists():
             break
 
