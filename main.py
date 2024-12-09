@@ -12,7 +12,7 @@ import account.orders
 import account.users
 import account.menu
 import account.review_and_comment
-from account.models import restaurant, Review, locations_of_restaurant
+from account.models import restaurant, Review
 from database import get_async_session
 from scheme import HomePageModel
 from send_sms import send_sms
@@ -48,27 +48,37 @@ async def most_popular(session: AsyncSession = Depends(get_async_session)):
 
 @router.get('/nearby_restaurants', summary="Get restaurants nearby")
 async def nearby_restaurants(
-        coordinates:str,
+        coordinates: str,
         session: AsyncSession = Depends(get_async_session)
 ) -> List[dict]:
+    # Query the database for restaurants with their coordinates
     location_query = (
-        select(restaurant.c.id, restaurant.c.name, restaurant.c.description, locations_of_restaurant.c.latitude,
-               locations_of_restaurant.c.longitude)
-        .join(locations_of_restaurant, restaurant.c.id == locations_of_restaurant.c.restaurant_id)
+        select(restaurant.c.id, restaurant.c.name, restaurant.c.description, restaurant.c.coordinates)
     )
     results = await session.execute(location_query)
     restaurants = results.mappings().all()
+
+    # Parse incoming coordinates
     try:
-        latitude, longitude = map(float, coordinates.split(','))
+        user_latitude, user_longitude = map(float, coordinates.split(','))
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid coordinates format. Expected 'latitude,longitude'."
         )
 
+    # Calculate distances
     restaurant_distances = []
     for r in restaurants:
-        distance = calculate_distance(latitude, longitude, r["latitude"], r["longitude"])
+        # Parse restaurant's coordinates
+        try:
+            latitude, longitude = map(float, r["coordinates"].split(','))
+        except ValueError:
+            # Skip if restaurant's coordinates are invalid
+            continue
+
+        # Calculate distance
+        distance = calculate_distance(user_latitude, user_longitude, latitude, longitude)
         restaurant_distances.append({
             "id": r["id"],
             "name": r["name"],
@@ -76,6 +86,7 @@ async def nearby_restaurants(
             "distance": f"{round(distance, 2)} km"
         })
 
+    # Sort restaurants by distance
     sorted_restaurants = sorted(restaurant_distances, key=lambda x: x["distance"])
     return sorted_restaurants
 

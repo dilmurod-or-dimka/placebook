@@ -42,17 +42,10 @@ restaurant = Table(
     Column("seats_left", Integer),
     Column("is_open", Boolean, default=True),
     Column("description", String),
+    Column('coordinates',String),
+    Column('photo',String),
     Column("created_at", DateTime, default=datetime.utcnow()),
     Column('chat_id', Integer, nullable=True),
-)
-
-locations_of_restaurant = Table(
-    'locations',
-    metadata,
-    Column("id", Integer, primary_key=True, index=True),
-    Column('restaurant_id', Integer, ForeignKey('restaurants.id')),
-    Column('latitude', Float),
-    Column('longitude', Float),
 )
 
 restaurants_photos = Table(

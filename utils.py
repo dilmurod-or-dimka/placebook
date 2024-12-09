@@ -111,3 +111,5 @@ async def send_mail_for_forget_password(email: str, code: int):
         server.send_message(email)
 
 
+def serialize_row(row):
+    return {key: (value.isoformat() if isinstance(value, datetime) else value) for key, value in row.items()}
