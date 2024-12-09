@@ -160,6 +160,7 @@ async def update_restaurant(
         phone_number: Optional[str] = None,
         number_of_people: Optional[int] = None,
         description: Optional[str] = None,
+        chat_id: Optional[str] = None,
         coordinates: Optional[str] = None,
         session: AsyncSession = Depends(get_async_session),
         token: dict = Depends(verify_token)
@@ -180,6 +181,8 @@ async def update_restaurant(
         fields_to_update["number_of_people"] = number_of_people
     if description:
         fields_to_update["description"] = description
+    if chat_id:
+        fields_to_update["chat_id"] = chat_id
     if coordinates:
         fields_to_update["coordinates"] = coordinates
 

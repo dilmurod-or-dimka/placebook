@@ -1,3 +1,4 @@
+from pyexpat.errors import messages
 from typing import List, Optional
 from datetime import datetime
 
@@ -5,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, delete, insert, update, Nullable
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from account.bot import send_to_telegram
 from account.models import Reservation, users, restaurant
 from database import get_async_session
 from scheme import OrderInput
@@ -40,6 +42,10 @@ async def make_order(
     session: AsyncSession = Depends(get_async_session),
 ):
     user_id = token['user_id']
+    first_name = await session.execute(select(users.c.firstname).where(users.c.id == user_id))
+    last_name = await session.execute(select(users.c.lastname).where(users.c.id == user_id))
+    frname = first_name.scalar()
+    ltname = last_name.scalar()
 
     # Validate the restaurant
     restaurant_check = await session.execute(select(restaurant).where(restaurant.c.id == order_data.restaurant_id))
@@ -49,7 +55,15 @@ async def make_order(
             detail="Restaurant not found."
         )
 
-    # Check seat availability
+    chatid = await session.execute(select(restaurant).where(order_data.restaurant_id == restaurant.c.id))
+    chat_id = chatid.mappings().all()
+    for chat in chat_id:
+        phone = chat.phone_number
+        date = order_data.reservation_time
+        guests = order_data.number_of_people
+        chatt_id = chat.chat_id
+    send_to_telegram(frname, ltname, phone, date, guests,chatt_id)
+
     selected_restaurant = await session.execute(
         select(restaurant.c.seats_left).where(restaurant.c.id == order_data.restaurant_id)
     )
@@ -57,7 +71,6 @@ async def make_order(
     if left_seats - order_data.number_of_people <= 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No seats left")
 
-    # Create the order
     order_values = {
         "user_id": user_id,
         "restaurant_id": order_data.restaurant_id,

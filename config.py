@@ -12,6 +12,8 @@ DB_HOST = os.environ.get('DB_HOST')
 DB_PORT = os.environ.get('DB_PORT')
 SECRET = os.environ.get('SECRET')
 
+BOT_TOKEN = os.environ.get('BOT_TOKEN')
+
 MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
 MAIL_FROM = os.environ.get('MAIL_FROM')
 MAIL_PORT = os.environ.get('MAIL_PORT')

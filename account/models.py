@@ -45,7 +45,7 @@ restaurant = Table(
     Column('coordinates',String),
     Column('photo',String),
     Column("created_at", DateTime, default=datetime.utcnow()),
-    Column('chat_id', Integer, nullable=True),
+    Column('chat_id', String, nullable=True),
 )
 
 restaurants_photos = Table(
